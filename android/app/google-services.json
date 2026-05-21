@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "641122196636",
+    "project_id": "disaster-response-bd",
+    "storage_bucket": "disaster-response-bd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:641122196636:android:7e670a2e55b84aabdae159",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANKznuS3Un0Dk3IVhVfcdyhZUBsdzzHUQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
