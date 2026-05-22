@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 import '../widgets/sos_button.dart';
@@ -13,7 +12,11 @@ import 'map_screen.dart';
 import 'first_aid_guide.dart';
 import 'emergency_contacts.dart';
 import 'help_request_feed.dart';
+import 'login_screen.dart';
+import 'profile_screen.dart';
+import 'weather_screen.dart';
 import 'admin/admin_dashboard.dart';
+import 'weather_screen.dart';
 
 const String adminEmail = 'admin@gmail.com';
 
@@ -28,8 +31,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   bool _sosSending = false;
   final _firestore = FirebaseFirestore.instance;
   final _auth = FirebaseAuth.instance;
+  final Set<String> _dismissedIds = {};
 
-  // Reverse Geocoding — Nominatim API, Web ও Android দুটোতেই কাজ করে
   Future<String> _getLocationName(double lat, double lng) async {
     try {
       final response = await http.get(
@@ -54,8 +57,39 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return 'Lat: ${lat.toStringAsFixed(4)}, Lng: ${lng.toStringAsFixed(4)}';
   }
 
-  // Dismissed notification IDs — local এ track করব
-  final Set<String> _dismissedIds = {};
+  // Logout
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Logout করবেন?'),
+        content: const Text('আপনি কি সত্যিই logout করতে চান?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('না'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+            child: const Text('হ্যাঁ, Logout',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _auth.signOut();
+      if (mounted) {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    }
+  }
 
   // Notification panel
   void _showNotifications() {
@@ -83,15 +117,16 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: [
                     const Icon(Icons.notifications, color: AppColors.primary),
                     const SizedBox(width: 8),
                     const Text('Notifications',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const Spacer(),
-                    // সব clear করো
                     TextButton.icon(
                       onPressed: () {
                         setModalState(() {});
@@ -124,7 +159,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.notifications_none, size: 60, color: Colors.grey),
+                            Icon(Icons.notifications_none,
+                                size: 60, color: Colors.grey),
                             SizedBox(height: 12),
                             Text('কোনো notification নেই',
                                 style: TextStyle(color: Colors.grey)),
@@ -133,7 +169,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       );
                     }
 
-                    // Dismissed গুলো বাদ দাও
                     final docs = snapshot.data!.docs
                         .where((d) => !_dismissedIds.contains(d.id))
                         .toList();
@@ -143,7 +178,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Icon(Icons.notifications_none, size: 60, color: Colors.grey),
+                            Icon(Icons.notifications_none,
+                                size: 60, color: Colors.grey),
                             SizedBox(height: 12),
                             Text('সব notification clear হয়েছে',
                                 style: TextStyle(color: Colors.grey)),
@@ -213,7 +249,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                 style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 14,
-                                    color: isResolved ? Colors.grey : Colors.black)),
+                                    color: isResolved
+                                        ? Colors.grey
+                                        : Colors.black)),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -231,17 +269,19 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                       const SizedBox(width: 8),
                                       const Text('✅ Resolved',
                                           style: TextStyle(
-                                              fontSize: 11, color: Colors.green)),
+                                              fontSize: 11,
+                                              color: Colors.green)),
                                     ],
                                   ],
                                 ),
                               ],
                             ),
-                            // ❌ Dismiss button
                             trailing: IconButton(
-                              icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                              icon: const Icon(Icons.close,
+                                  size: 18, color: Colors.grey),
                               onPressed: () {
-                                setModalState(() => _dismissedIds.add(doc.id));
+                                setModalState(
+                                    () => _dismissedIds.add(doc.id));
                                 setState(() {});
                               },
                             ),
@@ -285,9 +325,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // জায়গার নাম বের করো
-      final locationName = await _getLocationName(
-          position.latitude, position.longitude);
+      final locationName =
+          await _getLocationName(position.latitude, position.longitude);
 
       final user = _auth.currentUser;
       String userName = 'Unknown';
@@ -307,7 +346,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         'description': '$userName জরুরি সাহায্য চাইছেন! ফোন: $userPhone',
         'type': 'sos',
         'severity': 'critical',
-        'location': locationName, // coordinates এর বদলে জায়গার নাম
+        'location': locationName,
         'latitude': position.latitude,
         'longitude': position.longitude,
         'isResolved': false,
@@ -336,10 +375,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
               children: [
                 const Text('✅ আপনার emergency alert সফলভাবে পাঠানো হয়েছে।'),
                 const SizedBox(height: 8),
-                Text(
-                  '📍 Location: $locationName',
-                  style: const TextStyle(fontSize: 13),
-                ),
+                Text('📍 Location: $locationName',
+                    style: const TextStyle(fontSize: 13)),
                 const SizedBox(height: 8),
                 const Text('Responder রা শীঘ্রই যোগাযোগ করবে।'),
               ],
@@ -379,6 +416,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         backgroundColor: AppColors.primary,
         automaticallyImplyLeading: false,
         actions: [
+          // Notification bell
           StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('alerts')
@@ -416,18 +454,31 @@ class _HomeDashboardState extends State<HomeDashboard> {
               );
             },
           ),
+
+          // Profile button
+          IconButton(
+            icon: const Icon(Icons.person_outline, color: Colors.white),
+            tooltip: 'Profile',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ProfileScreen()),
+            ),
+          ),
+
+          // Admin button
           if (isAdmin)
             IconButton(
-              icon: const Icon(Icons.admin_panel_settings,
-                  color: Colors.white),
+              icon: const Icon(Icons.admin_panel_settings, color: Colors.white),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const AdminDashboard()),
               ),
             ),
+
+          // Logout button
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+            onPressed: _logout,
           ),
         ],
       ),
@@ -549,6 +600,33 @@ class _HomeDashboardState extends State<HomeDashboard> {
                       context,
                       MaterialPageRoute(
                           builder: (_) => const HelpRequestFeed())),
+                ),
+                CustomCard(
+                  icon: Icons.person_outline,
+                  title: 'My Profile',
+                  color: Colors.teal,
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const ProfileScreen())),
+                ),
+                CustomCard(
+                  icon: Icons.cloud,
+                  title: 'আবহাওয়া',
+                  color: Colors.lightBlue,
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const WeatherScreen())),
+                ),
+                CustomCard(
+                  icon: Icons.cloud_outlined,
+                  title: 'আবহাওয়া',
+                  color: Colors.cyan,
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const WeatherScreen())),
                 ),
                 if (isAdmin)
                   CustomCard(

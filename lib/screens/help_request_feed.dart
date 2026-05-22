@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../utils/constants.dart';
@@ -254,6 +255,48 @@ class _HelpRequestFeedState extends State<HelpRequestFeed> {
     if (result == null) return;
 
     try {
+      // GPS location নাও
+      double lat = 23.8103;
+      double lng = 90.4125;
+      String locationName = 'ঢাকা';
+
+      try {
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission != LocationPermission.denied &&
+              permission != LocationPermission.deniedForever) {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            );
+            lat = position.latitude;
+            lng = position.longitude;
+
+            // Location নাম বের করো
+            final response = await http.get(
+              Uri.parse(
+                'https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json',
+              ),
+              headers: {'Accept-Language': 'bn,en'},
+            );
+            if (response.statusCode == 200) {
+              final data = json.decode(response.body);
+              final address = data['address'];
+              final parts = [
+                address['village'] ?? address['suburb'] ?? address['neighbourhood'],
+                address['city'] ?? address['town'] ?? address['county'],
+              ].where((p) => p != null && (p as String).isNotEmpty).toList();
+              if (parts.isNotEmpty) locationName = parts.join(', ');
+            }
+          }
+        }
+      } catch (e) {
+        // Location না পেলে default Dhaka
+      }
+
       final user = _auth.currentUser;
       String userName = 'Unknown';
       if (user != null) {
@@ -269,9 +312,9 @@ class _HelpRequestFeedState extends State<HelpRequestFeed> {
         'description': result['description'],
         'type': result['type'],
         'severity': result['severity'],
-        'latitude': 23.8103,
-        'longitude': 90.4125,
-        'location': 'ঢাকা',
+        'latitude': lat,
+        'longitude': lng,
+        'location': locationName,
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': user?.uid ?? 'unknown',
         'createdByName': userName,
@@ -280,8 +323,8 @@ class _HelpRequestFeedState extends State<HelpRequestFeed> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('✅ Help request পাঠানো হয়েছে!'),
+          SnackBar(
+              content: Text('✅ Help request পাঠানো হয়েছে! 📍 $locationName'),
               backgroundColor: Colors.green),
         );
       }
